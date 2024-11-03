@@ -5,6 +5,7 @@
 // Assembly location: C:\TimeTracker\TimeTracker.dll
 
 #nullable disable
+
 namespace TimeTracker.ViewModelEntities
 {
     public static class Settings
@@ -14,5 +15,10 @@ namespace TimeTracker.ViewModelEntities
         public static string AdministrativeTask { get; set; }
 
         public static string Jira { get; set; }
+
+        public static string AdministrativeMessage { get; set; }
+        public static string MiscTask { get; set; }
+        public static int HistoryDepth { get; set; }
+        public static string[] Tags { get; internal set; }
     }
 }

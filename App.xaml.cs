@@ -26,12 +26,15 @@ namespace TimeTracker
         {
             services.AddSingleton(typeof(TimeTracker.MainWindow));
             services.AddSingleton(typeof(MainWindowViewModel));
+
             Settings.Authorization = this.Configuration.GetSection("Settings")["Authorization"];
             Settings.AdministrativeTask = this.Configuration.GetSection("Settings")["AdministrativeTask"];
             Settings.Jira = this.Configuration.GetSection("Settings")["Jira"];
+            Settings.AdministrativeMessage = this.Configuration.GetSection("Settings")["AdministrativeMessage"];
+            Settings.MiscTask = this.Configuration.GetSection("Settings")["MiscTask"];
+            Settings.HistoryDepth = int.Parse(this.Configuration.GetSection("Settings")["HistoryDepth"]);
 
-            
-            ////this.ServiceProvider.GetService<TimeTracker.MainWindow>().Show();
+            Settings.Tags = this.Configuration.GetSection("Settings:Tags").Get<string[]>();
         }
 
         protected override void OnStartup(StartupEventArgs e)

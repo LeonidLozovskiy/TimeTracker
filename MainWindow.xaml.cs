@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using MahApps.Metro.Controls;
+using TimeTracker.ViewModelEntities;
 
 #nullable disable
 namespace TimeTracker
@@ -23,7 +24,7 @@ namespace TimeTracker
             this.DataContext = _viewModel;
             this.InitializeComponent();
             foreach (var calendarDateRange in new List<CalendarDateRange>(this._viewModel.CalendarHistoryDates
-                .Where<DateTime>(x => x.Date != DateTime.Today.Date)
+                .Where<DateTime>(x => x.Date != DateTime.Today.Date && x.Date > DateTime.Today.AddDays(- Settings.HistoryDepth))
                 .Select<DateTime, CalendarDateRange>(x => new CalendarDateRange(x))))
             {
                 try

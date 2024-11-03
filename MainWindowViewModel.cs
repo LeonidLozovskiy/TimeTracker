@@ -12,6 +12,7 @@ namespace TimeTracker
     public class MainWindowViewModel : ViewModelBase, IDisposable
     {
         private ObservableCollection<TaskViewModel> tasks;
+        private ObservableCollection<string> tags = [];
         private readonly string AdmTaskName = Settings.AdministrativeTask;
         private string addTaskName = string.Empty;
         private TimeSpan timeBeforeAutoLog = TimeSpan.FromHours(0.0);
@@ -19,6 +20,9 @@ namespace TimeTracker
         private CancellationTokenSource cancellationTokenSource = new();
         private static readonly HttpClient Client = new();
         private string comment;
+        private int totalWorkTimeForDay;
+        private string selectedTag;
+        private bool isLogingInProgress;
         private DateTime logDate = DateTime.UtcNow;
         private HashSet<DateTime> _calendarHistoryDates;
 
@@ -33,9 +37,12 @@ namespace TimeTracker
                     new Action(RecalculateTime),
                     false,
                     120,
-                    "Дейли митинги, ревью кода, обсуждение рабочих вопросов с коллегами"),
+                    Settings.AdministrativeMessage),
             ]);
+            Tags = new ObservableCollection<string>(Settings.Tags);
+            TotalWorkTimeForDay = 480;
             AddCommand = new RelayCommand(AddTaskClick);
+            AddMiscCommand = new RelayCommand(AddMiscTaskClick);
             StartTimerCommand = new RelayCommand(StartTimer);
             SendLogsNowCommand = new RelayCommand(SendLogsNow);
             RecalculateTime();
@@ -58,7 +65,7 @@ namespace TimeTracker
                 num1 = 1;
             }
 
-            int num2 = 480 - tasks.Where(x => x.CustomTime != 0).Sum(x => x.CustomTime);
+            int num2 = totalWorkTimeForDay - tasks.Where(x => x.CustomTime != 0).Sum(x => x.CustomTime);
             int num3 = num2 / num1;
             int num4 = num2;
             foreach (var task in (Collection<TaskViewModel>)tasks)
@@ -82,7 +89,10 @@ namespace TimeTracker
             using LiteDatabase liteDatabase = new("History.db");
             ILiteCollection<History> collection = liteDatabase.GetCollection<History>("Histories", BsonAutoId.ObjectId);
             Histories.Clear();
-            foreach (var history in (IEnumerable<History>)collection.FindAll().OrderByDescending(x => x.Date))
+            foreach (var history in (IEnumerable<History>)collection
+                .FindAll()
+                .Where(x => x.Date > DateTime.Today.AddDays(-Settings.HistoryDepth))
+                .OrderByDescending(x => x.Date))
             {
                 Histories.Add(history);
             }
@@ -92,8 +102,20 @@ namespace TimeTracker
 
         private void AddTaskClick(object o)
         {
-            tasks.Add(new TaskViewModel(addTaskName, new Action<TaskViewModel>(DeleteTask), new Action(RecalculateTime)));
+            tasks.Add(new TaskViewModel(addTaskName,
+                new Action<TaskViewModel>(DeleteTask),
+                new Action(RecalculateTime),
+                comment: $"#{SelectedTag}: "));
             AddTaskName = string.Empty;
+            RecalculateTime();
+        }
+
+        private void AddMiscTaskClick(object o)
+        {
+            tasks.Add(new TaskViewModel(Settings.MiscTask,
+                new Action<TaskViewModel>(DeleteTask),
+                new Action(RecalculateTime),
+                comment: $"#{SelectedTag}: "));
             RecalculateTime();
         }
 
@@ -134,31 +156,40 @@ namespace TimeTracker
 
         private async Task LogTime()
         {
-            foreach (var task in tasks.Where(x => !x.IsLogged))
+            try
             {
-                try
+                IsLogingInProgress = true;
+                foreach (var task in tasks.Where(x => !x.IsLogged))
                 {
-                    using HttpRequestMessage request = new(
-                        new HttpMethod("POST"),
-                        "https://" + Settings.Jira + "/rest/api/2/issue/" + task.Name + "/worklog");
-                    request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Settings.Authorization);
-                    request.Content = new StringContent(string.Format(
-                        "{{                \n\"timeSpentSeconds\": \"{0}\",\n\"comment\": \"{1}\",\n\"started\": \"{2}.301+0300\"\n}}",
-                        task.TimeInMinutes * 60,
-                        task.Comment,
-                        LogDate.ToString("s", CultureInfo.InvariantCulture)));
-                    request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json");
-                    if ((await Client.SendAsync(request).ConfigureAwait(true)).IsSuccessStatusCode)
+                    try
                     {
-                        task.IsLogged = true;
-                        LogHistory(LogDate, task);
-                        GetHistory();
+                        using HttpRequestMessage request = new(
+                            new HttpMethod("POST"),
+                            "https://" + Settings.Jira + "/rest/api/2/issue/" + task.Name + "/worklog");
+                        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Settings.Authorization);
+                        request.Content = new StringContent(string.Format(
+                            "{{                \n\"timeSpentSeconds\": \"{0}\",\n\"comment\": \"{1}\",\n\"started\": \"{2}.301+0300\"\n}}",
+                            task.TimeInMinutes * 60,
+                            task.Comment,
+                            LogDate.ToString("s", CultureInfo.InvariantCulture)));
+                        request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json");
+                        if ((await Client.SendAsync(request).ConfigureAwait(true)).IsSuccessStatusCode)
+                        {
+                            task.IsLogged = true;
+                            LogHistory(LogDate, task);
+                            GetHistory();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.Message);
                     }
                 }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.Message);
-                }
+            }
+            finally
+            {
+                await Task.Delay(1000);
+                IsLogingInProgress = false;
             }
         }
 
@@ -187,12 +218,42 @@ namespace TimeTracker
         }
 
         public RelayCommand AddCommand { get; set; }
+        public RelayCommand AddMiscCommand { get; set; }
         public RelayCommand StartTimerCommand { get; set; }
 
         public ObservableCollection<TaskViewModel> Tasks
         {
             get => tasks;
             set => Set(ref tasks, value, nameof(Tasks));
+        }
+
+        public ObservableCollection<string> Tags
+        {
+            get => tags;
+            set => Set(ref tags, value, nameof(Tags));
+        }
+
+        public string SelectedTag
+        {
+            get => selectedTag;
+            set => Set(ref selectedTag, value, nameof(SelectedTag));
+        }
+
+        public bool IsLogingInProgress
+        {
+            get => isLogingInProgress;
+            set => Set(ref isLogingInProgress, value, nameof(IsLogingInProgress));
+        }
+
+        public int TotalWorkTimeForDay
+        {
+            get => totalWorkTimeForDay;
+
+            set
+            {
+                Set(ref totalWorkTimeForDay, value, nameof(TotalWorkTimeForDay));
+                RecalculateTime();
+            }
         }
 
         public TimeSpan TimeBeforeAutoLog
@@ -227,7 +288,6 @@ namespace TimeTracker
 
         public void Dispose()
         {
-            throw new NotImplementedException();
         }
     }
 }
