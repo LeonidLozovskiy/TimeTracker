@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography.X509Certificates;
 using System.Windows.Input;
 using LiteDB;
 using TimeTracker.ViewModelEntities;
@@ -18,10 +19,11 @@ namespace TimeTracker
         private TimeSpan timeBeforeAutoLog = TimeSpan.FromHours(0.0);
         private Task timer;
         private CancellationTokenSource cancellationTokenSource = new();
-        private static readonly HttpClient Client = new();
+        private static HttpClient Client;
         private string comment;
         private int totalWorkTimeForDay;
         private string selectedTag;
+        private string loadingMessage;
         private bool isLogingInProgress;
         private DateTime logDate = DateTime.UtcNow;
         private HashSet<DateTime> _calendarHistoryDates;
@@ -41,12 +43,27 @@ namespace TimeTracker
             ]);
             Tags = new ObservableCollection<string>(Settings.Tags);
             TotalWorkTimeForDay = 480;
+            LoadingMessage = "Загрузка...";
             AddCommand = new RelayCommand(AddTaskClick);
             AddMiscCommand = new RelayCommand(AddMiscTaskClick);
             StartTimerCommand = new RelayCommand(StartTimer);
             SendLogsNowCommand = new RelayCommand(SendLogsNow);
             RecalculateTime();
             GetHistory();
+
+            var store = new X509Store(StoreName.My, StoreLocation.CurrentUser);
+
+            store.Open(OpenFlags.ReadOnly);
+            var cert = store.Certificates.FirstOrDefault(x => x.Subject.Contains("mercury", StringComparison.InvariantCultureIgnoreCase));
+            if (cert == null)
+            {
+                IsLogingInProgress = true;
+                LoadingMessage = $"Сертификат не найден,{Environment.NewLine}логирование невозможно";
+            }
+
+            var handler = new HttpClientHandler();
+            handler.ClientCertificates.Add(cert);
+            Client = new HttpClient(handler);
         }
 
         public ICommand SendLogsNowCommand { get; set; }
@@ -164,8 +181,9 @@ namespace TimeTracker
                     try
                     {
                         using HttpRequestMessage request = new(
-                            new HttpMethod("POST"),
-                            "https://" + Settings.Jira + "/rest/api/2/issue/" + task.Name + "/worklog");
+                        new HttpMethod("POST"),
+                        "https://" + Settings.Jira + "/rest/api/2/issue/" + task.Name + "/worklog");
+
                         request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + Settings.Authorization);
                         request.Content = new StringContent(string.Format(
                             "{{                \n\"timeSpentSeconds\": \"{0}\",\n\"comment\": \"{1}\",\n\"started\": \"{2}.301+0300\"\n}}",
@@ -237,6 +255,12 @@ namespace TimeTracker
         {
             get => selectedTag;
             set => Set(ref selectedTag, value, nameof(SelectedTag));
+        }
+
+        public string LoadingMessage
+        {
+            get => loadingMessage;
+            set => Set(ref loadingMessage, value, nameof(LoadingMessage));
         }
 
         public bool IsLogingInProgress

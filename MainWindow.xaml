@@ -33,7 +33,7 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Grid  Grid.Row="0"  Grid.RowSpan="10" Background="Gray" Opacity="0.5" Visibility="{Binding IsLogingInProgress, Converter={StaticResource BooleanToVisibilityConverter}}" Panel.ZIndex="100">
-                <TextBlock Text="Загрузка..." HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontSize="24"/>
+                <TextBlock Text="{Binding Path=LoadingMessage}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="White" FontSize="24"/>
             </Grid>
             <Border BorderThickness="3" Grid.Row="0">
                 <Grid>
