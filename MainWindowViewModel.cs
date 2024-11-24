@@ -119,7 +119,7 @@ namespace TimeTracker
 
         private void AddTaskClick(object o)
         {
-            tasks.Add(new TaskViewModel(addTaskName,
+            tasks.Add(new TaskViewModel(addTaskName.Trim(),
                 new Action<TaskViewModel>(DeleteTask),
                 new Action(RecalculateTime),
                 comment: $"#{SelectedTag}: "));

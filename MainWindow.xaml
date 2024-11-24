@@ -137,10 +137,14 @@
                                             <DataTemplate>
                                                 <GroupBox Header="{Binding TaskId}">
                                                     <StackPanel Orientation="Vertical">
-                                                        <StackPanel Orientation="Horizontal">
-                                                            <Label Content="Comment: "/>
-                                                            <Label Content="{Binding Path=Comment}"/>
-                                                        </StackPanel>
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <Label Grid.Column="0" Content="Comment: "/>
+                                                            <TextBlock Grid.Column="1" TextWrapping="Wrap" Text="{Binding Path=Comment}"/>
+                                                        </Grid>
                                                         <StackPanel Orientation="Horizontal">
                                                             <Label Content="Time: "/>
                                                             <Label Content="{Binding TrackedTime}"/>

@@ -6,6 +6,7 @@
 
 using System.ComponentModel;
 using System.Reflection;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using MahApps.Metro.Controls;
@@ -23,8 +24,12 @@ namespace TimeTracker
             this._viewModel = viewModel;
             this.DataContext = _viewModel;
             this.InitializeComponent();
+
+            this.Left = (SystemParameters.WorkArea.Width - this.Width) / 2;
+            this.Top = (SystemParameters.WorkArea.Height - this.Height) / 2;
+
             foreach (var calendarDateRange in new List<CalendarDateRange>(this._viewModel.CalendarHistoryDates
-                .Where<DateTime>(x => x.Date != DateTime.Today.Date && x.Date > DateTime.Today.AddDays(- Settings.HistoryDepth))
+                .Where<DateTime>(x => x.Date != DateTime.Today.Date && x.Date > DateTime.Today.AddDays(-Settings.HistoryDepth))
                 .Select<DateTime, CalendarDateRange>(x => new CalendarDateRange(x))))
             {
                 try
